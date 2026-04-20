@@ -41,6 +41,16 @@ func generateShortCode() string {
 }
 
 func shortenHandler(w http.ResponseWriter, r *http.Request) {
+	// Enable CORS for frontend requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -48,6 +58,7 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req ShortenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
 		http.Error(w, `{"error": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
@@ -82,8 +93,23 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func redirectHandler(w http.ResponseWriter, r *http.Request) {
-	// Root path or redirect code
+func handleRoot(w http.ResponseWriter, r *http.Request) {
+	// Enable CORS
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Handle POST requests for shortening
+	if r.Method == http.MethodPost {
+		shortenHandler(w, r)
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -91,12 +117,15 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Extract code from path, e.g., /abc123
 	code := r.URL.Path[1:] // remove leading "/"
+
 	if code == "" {
-		// Just accessing root
-		fmt.Fprintln(w, "URL Shortener API is running!")
+		// Serve HTML on root path
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeFile(w, r, "index.html")
 		return
 	}
 
+	// Handle redirect for short codes
 	store.RLock()
 	originalURL, exists := store.urls[code]
 	store.RUnlock()
@@ -111,8 +140,7 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/shorten", shortenHandler)
-	http.HandleFunc("/", redirectHandler) // Catch-all for redirects
+	http.HandleFunc("/", handleRoot) // Handles GET /, POST /, and GET /:code
 
 	fmt.Println("Server is running at http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
