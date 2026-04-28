@@ -140,6 +140,16 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	
+ 	http.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+ 	 w.WriteHeader(http.StatusOK)
+  	w.Write([]byte("alive"))
+ 	})
+
+ 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+  	 w.WriteHeader(http.StatusOK)
+  	 w.Write([]byte("healthy"))
+ 	})
 	http.HandleFunc("/", handleRoot) // Handles GET /, POST /, and GET /:code
 
 	fmt.Println("Server is running at http://localhost:8080")
