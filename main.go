@@ -130,7 +130,8 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	if code == "" {
 		// Serve HTML on root path
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		http.ServeFile(w, r, "index.html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Welcome"))
 		return
 	}
 
@@ -173,24 +174,35 @@ func initDB() error {
 
 	return nil
 }
-func main() {
-	if err := initDB(); err != nil {
-		fmt.Printf("DB error: %s\n", err)
-		return
-	}
-	http.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+func newHandler() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("alive"))
 	})
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
 	})
-	http.HandleFunc("/", handleRoot) // Handles GET /, POST /, and GET /:code
+
+	mux.HandleFunc("/", handleRoot)
+
+	return mux
+}
+func run() error {
+	if err := initDB(); err != nil {
+		return fmt.Errorf("DB error: %w", err)
+	}
+
+	handler := newHandler()
 
 	fmt.Println("Server is running at http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	return http.ListenAndServe(":8080", handler)
+}
+func main() {
+	if err := run(); err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
 	}
 }
