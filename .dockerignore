@@ -3,3 +3,5 @@
 urls.db
 urls-shortener
 urls-shortener.exe
+*.exe
+*.out

@@ -8,3 +8,9 @@ dist/
 build/
 .next/
 out/
+*.db
+coverage.out
+*.out
+url-shortener
+url-shortener.exe
+*.exe
