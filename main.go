@@ -154,7 +154,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 func initDB() error {
 	var err error
 
-	db, err = sql.Open("sqlite", "urls.db")
+	db, err = sql.Open("sqlite", "/data/urls.db")
 	if err != nil {
 		return fmt.Errorf("failed to open db: %w", err)
 	}
