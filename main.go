@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sync"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -70,16 +71,19 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique code
 	var code string
-	store.Lock()
+
 	for {
 		code = generateShortCode()
-		if _, exists := store.urls[code]; !exists {
+		_, err := db.Exec(
+			"INSERT INTO urls(code, original_url, created_at) VALUES (?, ?, ?)",
+			code,
+			req.URL,
+			time.Now().Format(time.RFC3339),
+		)
+		if err == nil {
 			break
 		}
 	}
-	// Store the mapping in memory
-	store.urls[code] = req.URL
-	store.Unlock()
 
 	// Build the short URL
 	proto := "http"
@@ -131,11 +135,13 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle redirect for short codes
-	store.RLock()
-	originalURL, exists := store.urls[code]
-	store.RUnlock()
+	var originalURL string
+	err := db.QueryRow(
+		"SELECT original_url FROM urls WHERE code = ?",
+		code,
+	).Scan(&originalURL)
 
-	if !exists {
+	if err != nil {
 		http.Error(w, "Short URL not found", http.StatusNotFound)
 		return
 	}
