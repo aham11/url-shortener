@@ -16,6 +16,6 @@ WORKDIR /app
 COPY --from=builder /app/url-shortener .
 COPY --from=builder /app/frontend ./frontend
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["./url-shortener"]

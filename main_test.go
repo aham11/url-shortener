@@ -3,11 +3,11 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"net"
 
 	_ "modernc.org/sqlite"
 )
@@ -168,7 +168,6 @@ func Test_initDB_twice(t *testing.T) {
 	}
 }
 
-
 func Test_handleRoot_edgeCases(t *testing.T) {
 	handler := newHandler()
 
@@ -256,9 +255,9 @@ func Test_redirectHandler(t *testing.T) {
 }
 
 func Test_runFailsWhenPortIsAlreadyUsed(t *testing.T) {
-	ln, err := net.Listen("tcp", ":8080")
+	ln, err := net.Listen("tcp", ":8081")
 	if err != nil {
-		t.Skipf("cannot reserve port 8080: %v", err)
+		t.Skipf("cannot reserve port 8081: %v", err)
 	}
 	defer ln.Close()
 

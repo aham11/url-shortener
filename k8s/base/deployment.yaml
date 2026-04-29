@@ -18,11 +18,11 @@ spec:
           image: url-shortener:dev
           imagePullPolicy: Never
           ports:
-            - containerPort: 8080
+            - containerPort: 8081
           livenessProbe:
             httpGet:
               path: /live
-              port: 8080
+              port: 8081
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 2
@@ -30,7 +30,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: 8081
             initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 2

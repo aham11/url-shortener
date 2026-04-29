@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Copy, Check, Zap } from 'lucide-react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
 
 export default function Home() {
   const [url, setUrl] = useState('')
@@ -71,7 +71,7 @@ export default function Home() {
         setUrl('')
       }
     } catch (err) {
-      setError('Cannot connect to server. Make sure the API is running on http://localhost:8080')
+      setError('Cannot connect to server. Make sure the API is running on http://localhost:8081')
       console.error(err)
     } finally {
       setLoading(false)

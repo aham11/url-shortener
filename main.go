@@ -90,10 +90,10 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	if r.TLS != nil {
 		proto = "https"
 	}
-	// Fallback to localhost:8080 if Host is not set or empty (it usually is set)
+	// Fallback to localhost:8081 if Host is not set or empty (it usually is set)
 	host := r.Host
 	if host == "" {
-		host = "localhost:8080"
+		host = "localhost:8081"
 	}
 	shortURL := fmt.Sprintf("%s://%s/%s", proto, host, code)
 
@@ -198,8 +198,8 @@ func run() error {
 
 	handler := newHandler()
 
-	fmt.Println("Server is running at http://localhost:8080")
-	return http.ListenAndServe(":8080", handler)
+	fmt.Println("Server is running at http://localhost:8081")
+	return http.ListenAndServe(":8081", handler)
 }
 func main() {
 	if err := run(); err != nil {
