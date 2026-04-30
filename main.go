@@ -183,6 +183,14 @@ func newHandler() http.Handler {
 	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if db == nil {
+			http.Error(w, "database not initialized", http.StatusServiceUnavailable)
+			return
+		}
+		if err := db.Ping(); err != nil {
+			http.Error(w, "database not reachable", http.StatusServiceUnavailable)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
 	})

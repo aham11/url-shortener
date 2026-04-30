@@ -46,28 +46,42 @@ func Test_healthEndpoints(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		path     string
+		setupDB  bool
 		expected expectedHTTP
 	}{
 		{
-			name: "live endpoint",
-			path: "/live",
+			name:    "live endpoint",
+			path:    "/live",
+			setupDB: false,
 			expected: expectedHTTP{
 				status: http.StatusOK,
 				body:   "alive",
 			},
 		},
 		{
-			name: "health endpoint",
-			path: "/health",
+			name:    "health endpoint",
+			path:    "/health",
+			setupDB: true,
 			expected: expectedHTTP{
 				status: http.StatusOK,
 				body:   "healthy",
 			},
 		},
+		{
+			name:    "health endpoint without database",
+			path:    "/health",
+			setupDB: false,
+			expected: expectedHTTP{
+				status: http.StatusServiceUnavailable,
+				body:   "database not initialized",
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			setupTestDB(t)
-
+			db = nil
+			if test.setupDB {
+				setupTestDB(t)
+			}
 			req := httptest.NewRequest(http.MethodGet, test.path, nil)
 			rec := httptest.NewRecorder()
 
