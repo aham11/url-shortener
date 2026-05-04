@@ -1,9 +1,8 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: url-shortener
 spec:
-  serviceName: url-shortener
   replicas: 1
   selector:
     matchLabels:
@@ -23,28 +22,14 @@ spec:
             httpGet:
               path: /live
               port: 8081
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 8081
-            initialDelaySeconds: 2
-            periodSeconds: 5
-            timeoutSeconds: 2
-            failureThreshold: 3
           volumeMounts:
             - name: data
               mountPath: /data
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        storageClassName: local-path
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: url-shortener-pvc
