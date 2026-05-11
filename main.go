@@ -7,21 +7,10 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
-
-// URLStore safely manages URLs in memory
-type URLStore struct {
-	sync.RWMutex
-	urls map[string]string
-}
-
-var store = URLStore{
-	urls: make(map[string]string),
-}
 
 var db *sql.DB
 
@@ -103,10 +92,10 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	if r.TLS != nil {
 		proto = "https"
 	}
-	// Fallback to localhost:8081 if Host is not set or empty (it usually is set)
+	// Fallback to localhost address  if Host is not set
 	host := r.Host
 	if host == "" {
-		host = "localhost:8081"
+		host = "localhost:" + envOrDefault("PORT", "8081")
 	}
 	shortURL := fmt.Sprintf("%s://%s/%s", proto, host, code)
 
@@ -144,7 +133,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 		// Serve HTML on root path
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Welcome"))
+		w.Write([]byte("URL shortener backend"))
 		return
 	}
 
@@ -159,7 +148,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Short URL not found", http.StatusNotFound)
 		return
 	}
-
+	_, _ = db.Exec("UPDATE urls SET visits = visits + 1 WHERE code = ?", code)
 	// Redirect user to the original URL
 	http.Redirect(w, r, originalURL, http.StatusFound)
 }
