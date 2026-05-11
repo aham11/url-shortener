@@ -1,15 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	_ "modernc.org/sqlite"
 	"net/http"
 	"os"
+	"strings"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 var db *sql.DB
@@ -68,24 +69,36 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate a unique code
-	var code string
+	sqliteURL := envOrDefault("SQLITE_SERVICE_URL", "http://url-shortener-sqlite")
 
-	for attempts := range 5 {
-		code = generateShortCode()
-		_, err := db.Exec(
-			"INSERT INTO urls(code, original_url, created_at) VALUES (?, ?, ?)",
-			code,
-			req.URL,
-			time.Now().Format(time.RFC3339),
-		)
-		if err == nil {
-			break
-		}
-		if attempts == 4 {
-			http.Error(w, "failed to generate unique short code", http.StatusInternalServerError)
-			return
-		}
+	body, err := json.Marshal(req)
+	if err != nil {
+		http.Error(w, "failed to encode request", http.StatusInternalServerError)
+		return
 	}
+
+	resp, err := http.Post(sqliteURL+"/internal/shorten", "application/json", bytes.NewReader(body))
+	if err != nil {
+		http.Error(w, "sqlite service unavailable", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "sqlite service error", http.StatusBadGateway)
+		return
+	}
+
+	var sqliteResp struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&sqliteResp); err != nil || sqliteResp.Code == "" {
+		http.Error(w, "invalid sqlite response", http.StatusBadGateway)
+		return
+	}
+
+	code := sqliteResp.Code
 
 	// Build the short URL
 	proto := "http"
@@ -99,9 +112,9 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	shortURL := fmt.Sprintf("%s://%s/%s", proto, host, code)
 
-	resp := ShortenResponse{Short: shortURL}
+	Response := ShortenResponse{Short: shortURL}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(Response)
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -138,21 +151,37 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle redirect for short codes
-	var originalURL string
-	err := db.QueryRow(
-		"SELECT original_url FROM urls WHERE code = ?",
-		code,
-	).Scan(&originalURL)
+	sqliteURL := envOrDefault("SQLITE_SERVICE_URL", "http://url-shortener-sqlite")
 
+	sqliteRespHTTP, err := http.Get(sqliteURL + "/internal/resolve/" + code)
 	if err != nil {
+		http.Error(w, "sqlite service unavailable", http.StatusBadGateway)
+		return
+	}
+	defer sqliteRespHTTP.Body.Close()
+
+	if sqliteRespHTTP.StatusCode == http.StatusNotFound {
 		http.Error(w, "Short URL not found", http.StatusNotFound)
 		return
 	}
-	_, _ = db.Exec("UPDATE urls SET visits = visits + 1 WHERE code = ?", code)
-	// Redirect user to the original URL
-	http.Redirect(w, r, originalURL, http.StatusFound)
-}
 
+	if sqliteRespHTTP.StatusCode != http.StatusOK {
+		http.Error(w, "sqlite service error", http.StatusBadGateway)
+		return
+	}
+
+	var sqliteResp struct {
+		URL string `json:"url"`
+	}
+
+	if err := json.NewDecoder(sqliteRespHTTP.Body).Decode(&sqliteResp); err != nil || sqliteResp.URL == "" {
+		http.Error(w, "invalid sqlite response", http.StatusBadGateway)
+		return
+	}
+
+	http.Redirect(w, r, sqliteResp.URL, http.StatusFound)
+
+}
 func initDB() error {
 	var err error
 	dbPth := envOrDefault("DB_PATH", "/data/urls.db")
@@ -185,14 +214,6 @@ func newHandler() http.Handler {
 	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		if db == nil {
-			http.Error(w, "database not initialized", http.StatusServiceUnavailable)
-			return
-		}
-		if err := db.Ping(); err != nil {
-			http.Error(w, "database not reachable", http.StatusServiceUnavailable)
-			return
-		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("healthy"))
 	})
@@ -201,14 +222,107 @@ func newHandler() http.Handler {
 
 	return mux
 }
+func newSQLiteHandler() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("alive"))
+	})
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if db == nil {
+			http.Error(w, "database not initialized", http.StatusServiceUnavailable)
+			return
+		}
+
+		if err := db.Ping(); err != nil {
+			http.Error(w, "database not reachable", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("healthy"))
+	})
+
+	mux.HandleFunc("/internal/shorten", internalShortenHandler)
+	mux.HandleFunc("/internal/resolve/", internalResolveHandler)
+
+	return mux
+}
+func internalShortenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ShortenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	code := generateShortCode()
+
+	_, err := db.Exec(
+		"INSERT INTO urls(code, original_url, created_at) VALUES (?, ?, ?)",
+		code,
+		req.URL,
+		time.Now().Format(time.RFC3339),
+	)
+
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]string{
+		"code": code,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func internalResolveHandler(w http.ResponseWriter, r *http.Request) {
+	code := strings.TrimPrefix(r.URL.Path, "/internal/resolve/")
+
+	var originalURL string
+
+	err := db.QueryRow(
+		"SELECT original_url FROM urls WHERE code = ?",
+		code,
+	).Scan(&originalURL)
+
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	resp := map[string]string{
+		"url": originalURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
 func run() error {
-	if err := initDB(); err != nil {
-		return fmt.Errorf("DB error: %w", err)
+	mode := envOrDefault("APP_MODE", "backend")
+
+	if mode == "sqlite" {
+		if err := initDB(); err != nil {
+			return fmt.Errorf("DB error: %w", err)
+		}
+		handler := newSQLiteHandler()
+		port := envOrDefault("PORT", "8081")
+		fmt.Println("SQLite owner is running at http://localhost:" + port)
+		return http.ListenAndServe(":"+port, handler)
 	}
 
 	handler := newHandler()
 	port := envOrDefault("PORT", "8081")
-	fmt.Println("Server is running at http://localhost:" + port)
+	fmt.Println("Backend is running at http://localhost:" + port)
 	return http.ListenAndServe(":"+port, handler)
 }
 func main() {

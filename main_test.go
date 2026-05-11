@@ -72,8 +72,8 @@ func Test_healthEndpoints(t *testing.T) {
 			path:    "/health",
 			setupDB: false,
 			expected: expectedHTTP{
-				status: http.StatusServiceUnavailable,
-				body:   "database not initialized",
+				status: http.StatusOK,
+				body:   "healthy",
 			},
 		},
 	} {
@@ -140,9 +140,13 @@ func Test_shortenHandler(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T){
 			setupTestDB(t)
 
+			sqliteServer := httptest.NewServer(newSQLiteHandler())
+			defer sqliteServer.Close()
+
+			t.Setenv("SQLITE_SERVICE_URL", sqliteServer.URL)
 			req := httptest.NewRequest(test.method, "/", strings.NewReader(test.body))
 			req.Header.Set("Content-Type", "application/json")
 
@@ -196,6 +200,12 @@ func Test_handleRoot_edgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setupTestDB(t)
+
+			sqliteServer := httptest.NewServer(newSQLiteHandler())
+			defer sqliteServer.Close()
+
+			t.Setenv("SQLITE_SERVICE_URL", sqliteServer.URL)
 			req := httptest.NewRequest("GET", tt.path, nil)
 			w := httptest.NewRecorder()
 
@@ -236,6 +246,11 @@ func Test_redirectHandler(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			setupTestDB(t)
+
+			sqliteServer := httptest.NewServer(newSQLiteHandler())
+			defer sqliteServer.Close()
+
+			t.Setenv("SQLITE_SERVICE_URL", sqliteServer.URL)
 
 			if test.seedCode != "" {
 				_, err := db.Exec(
