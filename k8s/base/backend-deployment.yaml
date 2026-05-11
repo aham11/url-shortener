@@ -29,3 +29,7 @@ spec:
           env:
             - name: PORT
               value: "8081"
+            - name: APP_MODE
+              value: "backend"
+            - name: SQLITE_SERVICE_URL
+              value: "http://url-shortener-sqlite"

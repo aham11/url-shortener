@@ -18,6 +18,8 @@ spec:
           image: url-shortener:dev
           imagePullPolicy: Never
           env:
+            - name: APP_MODE
+              value: "sqlite"
             - name: PORT
               value: "8081"
             - name: DB_PATH
