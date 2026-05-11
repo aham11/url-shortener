@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -35,6 +36,14 @@ type ShortenRequest struct {
 // ShortenResponse represents the JSON response body
 type ShortenResponse struct {
 	Short string `json:"short"`
+}
+
+func envOrDefault(key, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 // Generate a random string for the short code
@@ -153,8 +162,8 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 func initDB() error {
 	var err error
-
-	db, err = sql.Open("sqlite", "/data/urls.db")
+	dbPth := envOrDefault("DB_PATH", "/data/urls.db")
+	db, err = sql.Open("sqlite", dbPth)
 	if err != nil {
 		return fmt.Errorf("failed to open db: %w", err)
 	}
@@ -205,9 +214,9 @@ func run() error {
 	}
 
 	handler := newHandler()
-
-	fmt.Println("Server is running at http://localhost:8081")
-	return http.ListenAndServe(":8081", handler)
+	port := envOrDefault("PORT", "8081")
+	fmt.Println("Server is running at http://localhost:" + port)
+	return http.ListenAndServe(":"+port, handler)
 }
 func main() {
 	if err := run(); err != nil {
