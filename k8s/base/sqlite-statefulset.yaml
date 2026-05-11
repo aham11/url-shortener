@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: url-shortener-sqlite
+spec:
+  serviceName: url-shortener-sqlite
+  replicas: 1
+  selector:
+    matchLabels:
+      app: url-shortener-sqlite
+  template:
+    metadata:
+      labels:
+        app: url-shortener-sqlite
+    spec:
+      containers:
+        - name: sqlite
+          image: url-shortener:dev
+          imagePullPolicy: Never
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DB_PATH
+              value: "/data/urls.db"
+          ports:
+            - containerPort: 8081
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: local-path
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

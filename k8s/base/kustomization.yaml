@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - backend-deployment.yaml
   - backend-service.yaml
+  - sqlite-statefulset.yaml
 Labels:
   - pairs:
       app: url-shortener
