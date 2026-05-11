@@ -5,6 +5,7 @@ resources:
   - backend-deployment.yaml
   - backend-service.yaml
   - sqlite-statefulset.yaml
+  - sqlite-service.yaml
 Labels:
   - pairs:
       app: url-shortener
