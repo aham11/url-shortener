@@ -81,7 +81,7 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate a unique code
 	var code string
 
-	for {
+	for attempts := range 5 {
 		code = generateShortCode()
 		_, err := db.Exec(
 			"INSERT INTO urls(code, original_url, created_at) VALUES (?, ?, ?)",
@@ -91,6 +91,10 @@ func shortenHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		if err == nil {
 			break
+		}
+		if attempts == 4 {
+			http.Error(w, "failed to generate unique short code", http.StatusInternalServerError)
+			return
 		}
 	}
 
