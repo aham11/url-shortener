@@ -3,10 +3,9 @@ kind: Service
 metadata:
   name: url-shortener-backend
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: url-shortener
   ports:
     - port: 80
       targetPort: 8081
-      nodePort: 30080

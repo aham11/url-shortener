@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: url-shortener
+  name: url-shortener-backend
 spec:
   replicas: 1
   selector:
@@ -13,7 +13,7 @@ spec:
         app: url-shortener
     spec:
       containers:
-        - name: url-shortener
+        - name: backend
           image: url-shortener:dev
           imagePullPolicy: Never
           ports:
