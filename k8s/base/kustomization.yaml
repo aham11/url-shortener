@@ -8,6 +8,8 @@ resources:
   - sqlite-service.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
+  - gateway.yaml
+  - httproute.yaml
 labels:
   - pairs:
       app: url-shortener
